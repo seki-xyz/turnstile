@@ -86,8 +86,19 @@ class ModelRuntimeService:
         # Injectable so a test never reaches a vendor's website.
         self._price_catalog = price_catalog or build_default_catalog()
 
-    def authorize(self, role: str, authorization: str | None, *, manage: bool) -> None:
-        if manage:
+    def authorize(
+        self,
+        role: str,
+        authorization: str | None,
+        *,
+        manage: bool,
+        authenticated_owner: bool = False,
+    ) -> None:
+        # Only an HTTP route that has resolved OwnerSession may assert this flag.
+        # Browser owners authenticate with their session, without receiving the
+        # server's management key. Explicit bearer credentials still get checked.
+        owner_session_only = authenticated_owner and role == "owner" and authorization is None
+        if manage and not owner_session_only:
             configured = self._settings.management_api_key
             if configured is not None:
                 expected = f"Bearer {configured.get_secret_value()}"

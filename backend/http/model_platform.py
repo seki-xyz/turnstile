@@ -127,7 +127,9 @@ def create_gateway_profile(
     identity: OwnerSession,
     authorization: Authorization = None,
 ) -> RegistryResponse:
-    service.authorize(identity.role, authorization, manage=True)
+    service.authorize(
+        identity.role, authorization, manage=True, authenticated_owner=True
+    )
     return service.save_gateway(write)
 
 
@@ -141,7 +143,9 @@ def update_gateway_profile(
     identity: OwnerSession,
     authorization: Authorization = None,
 ) -> RegistryResponse:
-    service.authorize(identity.role, authorization, manage=True)
+    service.authorize(
+        identity.role, authorization, manage=True, authenticated_owner=True
+    )
     return service.save_gateway(write, item_id)
 
 
@@ -165,7 +169,9 @@ def create_provider(
     identity: OwnerSession,
     authorization: Authorization = None,
 ) -> RegistryResponse:
-    service.authorize(identity.role, authorization, manage=True)
+    service.authorize(
+        identity.role, authorization, manage=True, authenticated_owner=True
+    )
     return service.save_provider(write)
 
 
@@ -179,7 +185,9 @@ def update_provider(
     identity: OwnerSession,
     authorization: Authorization = None,
 ) -> RegistryResponse:
-    service.authorize(identity.role, authorization, manage=True)
+    service.authorize(
+        identity.role, authorization, manage=True, authenticated_owner=True
+    )
     return service.save_provider(write, item_id)
 
 
@@ -190,7 +198,9 @@ def create_runtime(
     identity: OwnerSession,
     authorization: Authorization = None,
 ) -> RegistryResponse:
-    service.authorize(identity.role, authorization, manage=True)
+    service.authorize(
+        identity.role, authorization, manage=True, authenticated_owner=True
+    )
     return service.save_runtime(write)
 
 
@@ -266,7 +276,9 @@ def update_runtime(
     identity: OwnerSession,
     authorization: Authorization = None,
 ) -> RegistryResponse:
-    service.authorize(identity.role, authorization, manage=True)
+    service.authorize(
+        identity.role, authorization, manage=True, authenticated_owner=True
+    )
     return service.save_runtime(write, item_id)
 
 
