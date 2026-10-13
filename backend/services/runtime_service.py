@@ -1120,7 +1120,9 @@ class ModelRuntimeService:
         *,
         request_id: str | None = None,
         timeout_ms: int | None = None,
+        gateway_credential_override: str | None = None,
         enforce_user_model_access: bool = True,
+        enforce_local_user_budget: bool = True,
     ) -> ModelInvocationResponse:
         request_id = request_id or str(uuid4())
         route = self._repository.invocation_route(request.runtime_id, request.model_id)
@@ -1139,6 +1141,41 @@ class ModelRuntimeService:
         ):
             route["gateway_base_url"] = self._settings.apim_gateway_url
         route = self._model_protocol_route(route)
+        if gateway_credential_override is not None:
+            if route.get("gateway_implementation") != GatewayKind.APIM:
+                raise HTTPException(
+                    status_code=409,
+                    detail="APIM Subscription Keys can only be used with an APIM route",
+                )
+            if not route.get("gateway_id") or not route.get("gateway_base_url"):
+                raise HTTPException(
+                    status_code=503,
+                    detail="The configured APIM gateway is unavailable",
+                )
+            mappings = self._repository.gateway_application_attribution_map(
+                route["gateway_id"]
+            )
+            if not any(
+                str(mapping.get("application_status")) == "active"
+                and str(mapping.get("subscription_state")) == "active"
+                and bool(mapping.get("scope_exists"))
+                and bool(mapping.get("owner_user_id"))
+                and bool(mapping.get("owner_enabled"))
+                and bool(mapping.get("tenant_enabled"))
+                and bool(mapping.get("tenant_id"))
+                and bool(mapping.get("owner_tenant_id"))
+                and str(mapping.get("owner_tenant_id"))
+                == str(mapping.get("tenant_id"))
+                and (
+                    not mapping.get("organization_unit_id")
+                    or bool(mapping.get("organization_unit_enabled"))
+                )
+                for mapping in mappings
+            ):
+                raise HTTPException(
+                    status_code=403,
+                    detail="No active APIM Subscription owner mapping is available",
+                )
         if self._settings.production and route.get("gateway_implementation") != GatewayKind.APIM:
             raise HTTPException(
                 status_code=409,
@@ -1146,10 +1183,12 @@ class ModelRuntimeService:
             )
         if enforce_user_model_access:
             self._assert_model_allowed(request, route, request_id)
-        self._assert_budget_available(request, route, request_id)
+        if enforce_local_user_budget:
+            self._assert_budget_available(request, route, request_id)
         route = self._decrypt_route(route)
         if (
-            route.get("gateway_implementation") == GatewayKind.APIM
+            gateway_credential_override is None
+            and route.get("gateway_implementation") == GatewayKind.APIM
             and not route.get("gateway_credential")
             and self._settings.apim_dashboard_subscription_key
         ):
@@ -1157,6 +1196,11 @@ class ModelRuntimeService:
                 self._settings.apim_dashboard_subscription_key.get_secret_value()
             )
             route["gateway_auth_type"] = "api_key"
+        if gateway_credential_override is not None:
+            # Per-request only. The adapter emits this value solely as the fixed APIM
+            # subscription header; it is never placed in settings, repository state,
+            # route credentials, telemetry, or error details.
+            route["gateway_credential_override"] = gateway_credential_override
         if timeout_ms is not None:
             runtime_config = dict(route.get("runtime_config") or {})
             configured_timeout = float(runtime_config.get("timeout_seconds", 120))
